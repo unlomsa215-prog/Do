@@ -1,4 +1,4 @@
-import telebot
+анimport telebot
 from telebot import types
 import random
 import time
@@ -887,32 +887,44 @@ def handle_all_messages(message):
 def start_command(message):
     user_id = str(message.from_user.id)
     try:
+        print(f"✅ /start от пользователя {user_id} (@{message.from_user.username})")
         user = get_user(user_id)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         bot.send_message(message.chat.id, f"❌ Ошибка при создании профиля: {e}")
         return
+
     update_username_cache(user_id, message.from_user.username)
 
+    # Проверка реферальной ссылки
     args = message.text.split()
     if len(args) > 1:
         referrer_id = args[1]
         if referrer_id != user_id and referrer_id in users and user.get('referrer') is None:
-            with data_lock:
-                user['referrer'] = referrer_id
-                referrer = get_user(referrer_id)
-                referrer['referrals'] = referrer.get('referrals', 0) + 1
-                referrer['balance'] += bonus_data['referral_bonus']
-                referrer['krds_balance'] += 5
-                if referrer['referrals'] >= 10:
-                    unlock_achievement(referrer_id, 'referral_master')
-                save_data()
             try:
-                bot.send_message(int(referrer_id),
-                    f"👥 По вашей ссылке зарегистрировался новый игрок!\n"
-                    f"💰 +{format_number(bonus_data['referral_bonus'])} кредиксов\n"
-                    f"💎 +5 KRDS")
-            except:
-                pass
+                with data_lock:
+                    user['referrer'] = referrer_id
+                    referrer = get_user(referrer_id)
+                    referrer['referrals'] = referrer.get('referrals', 0) + 1
+                    # Убедимся, что bonus_data существует и содержит ключ
+                    global bonus_data
+                    if not bonus_data:
+                        bonus_data = {'referral_bonus': 5000}
+                    referrer['balance'] += bonus_data.get('referral_bonus', 5000)
+                    referrer['krds_balance'] += 5
+                    if referrer['referrals'] >= 10:
+                        unlock_achievement(referrer_id, 'referral_master')
+                    save_data()
+                try:
+                    bot.send_message(int(referrer_id),
+                        f"👥 По вашей ссылке зарегистрировался новый игрок!\n"
+                        f"💰 +{format_number(bonus_data.get('referral_bonus', 5000))} кредиксов\n"
+                        f"💎 +5 KRDS")
+                except:
+                    pass
+            except Exception as e:
+                print(f"Ошибка при обработке реферала: {e}")
 
     text = (
         f"👋 Добро пожаловать, {message.from_user.first_name}!\n\n"
